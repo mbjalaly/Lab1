@@ -2,29 +2,89 @@
 title: "Lab1-Week4"
 author: "Mohamed Jalaly"
 date: "2/8/2022"
-output: github_document
+output: html_document
+---
+---
+title: "Basic Template"
+output:
+  pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r libraries, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(gapminder)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
 ```
 
-## Including Plots
+# Introduction {#sec:intro}
 
-You can also embed plots, for example:
+This report will examine the relationship between students evaluation scores for professors, and the professors' gender and age. The analysis will be made on the 'evals' dataset, avaialble in R moderndive package, gathered at the University of Texas at Austin for 463 courses, taught by 94 professors. The study aims to investigate whether age and gender have an underlying effect on students' evaluation scores, and whether this effect is in favor or against the professor. Additionally, the study aims to investigate whether male or female professors' evaluation scores are more affected by age, and in what direction.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Exploratory Data Analysis {#sec:EDA}
+First, the study explored numerical summaries of the `r nrow(evals)` course evaluations, to get an idea of the scores distribution. These are shown in Table \ref{tab:summary-evals}. Additionally, Figure \ref{fig:histscores} shows the distribution of the `r nrow(evals)` evaluation scores.
+
+```{r summary.numerical.scores, echo=FALSE, eval=TRUE}
+
+summaries = as.data.frame(c(min(evals$score),quantile(evals$score, probs = c(.25)),median(evals$score),mean(evals$score),quantile(evals$score, probs = c(.75)),max(evals$score)))
+row.names(summaries) = c("Min.","1st Qu.", "Median", "Mean", "3rd Qu.", "Max.")
+names(summaries) = c("Value")
+summaries = t(summaries)
+  
+   kable(summaries, caption = '\\label{tab:summary-evals} Summary Statistics on the 436 Course Evaluations', align="cccccc") %>%
+   kable_styling(font_size = 10, latex_options = "hold_position")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r, echo=FALSE, eval = TRUE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:histscores} Histogram of the Scores Evaluation", fig.pos = "H"}
+ggplot(evals, aes(x = score)) +
+      geom_histogram(bins=8, color = "white", fill="steelblue") +
+      labs(x = "Evaluation Score", y="Count") 
+```
+
+Also, the gender and age distribution of the professors is shown in Figure \ref{fig:agegenderhist}.
+
+```{r, echo=FALSE, eval = TRUE, warnings=FALSE, message=FALSE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:agegenderhist} Histogram of the Scores Evaluation", fig.pos = "H"}
+
+ggplot(evals, aes(x = age, fill=gender)) +
+      geom_histogram(color = "white") +
+      labs(x = "age", y="Count by Gender") 
+```
+
+
+# Formal Data Analysis {#sec:FDA}
+To investigate the relationship between Evaluation Score, as a response variable, and Age and Gender as explanatory variables, we fit a linear regression model of the form:
+
+$$\widehat{\mbox{Evaluation\_Score}} = \alpha + \beta_1 ~ \mbox{Age} + \beta_2 ~ \mbox{Gender} + \epsilon_i, ~~~~ \epsilon_i \sim N(0, \sigma^2),$$
+
+We fit the linear regression model in R:
+
+```{r, eval = TRUE}
+model=lm(evals$score~evals$age+evals$gender)
+```
+```{r}
+summary(model)
+```
+From the model summary, we can see that both age and gender are significant predictors of evaluation score at 5% significance level. If we plot a scatter of Evaluation Score against Age and display points based on the Gender, we see Figure \ref{fig:regscatter}.
+
+
+```{r, echo=FALSE, eval = TRUE, warnings=FALSE, message=FALSE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:regscatter} Histogram of the Scores Evaluation", fig.pos = "H"}
+
+ggplot(evals, aes(x = age, y= score, color=gender)) +
+      geom_point() +
+      labs(x = "Age", y="Score") +
+  geom_smooth(method = "lm", se = FALSE)
+  
+
+```
+
+
+# Conclusions {#sec:Conc}
+
