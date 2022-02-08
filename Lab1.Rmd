@@ -2,89 +2,285 @@
 title: "Lab1-Week4"
 author: "Mohamed Jalaly"
 date: "2/8/2022"
-output: html_document
+output: github_document
 ---
----
-title: "Basic Template"
-output:
-  pdf_document: default
-  word_document: default
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, comment = NA)
-```
-
-```{r libraries, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+```{r loadlib, echo=FALSE, eval=TRUE, warning=TRUE, message=TRUE}
 library(ggplot2)
 library(dplyr)
 library(moderndive)
 library(gapminder)
 library(skimr)
-library(kableExtra)
-library(gridExtra)
 ```
 
-# Introduction {#sec:intro}
+# Simple Linear Regression {#sec:simplereg}
 
-This report will examine the relationship between students evaluation scores for professors, and the professors' gender and age. The analysis will be made on the 'evals' dataset, avaialble in R moderndive package, gathered at the University of Texas at Austin for 463 courses, taught by 94 professors. The study aims to investigate whether age and gender have an underlying effect on students' evaluation scores, and whether this effect is in favor or against the professor. Additionally, the study aims to investigate whether male or female professors' evaluation scores are more affected by age, and in what direction.
+For response variable **y**, and explanatory variable **x**, the data can be expressed as:
+
+$$ (y_i,x_i),~~~i = 1, 2, ..., n. $$
+
+Hence, a simple linear regression model can be written as follows:
+
+$$ y_i = \alpha + \beta x_i + \epsilon_i, ~~~~ \epsilon_i\sim N(0,\sigma^2),$$
+where:
+
+*   $y_i$ is the $i^{th}$ observation of the response variable;
+*   $\alpha$ is the intercept of the regression line;
+*   $\beta$ is the slope of the regression line;
+*   $x_i$ is the $i^{th}$ observation of the explanatory variable; and
+*   $\epsilon_i$ is the $i^{th}$ random component.
+
+Thus, the full probability model for $y_i$ given $x_i$ $(y_i|x_i)$ can be written as:
+
+$$ y_i|x_i \sim N(\alpha+\beta x_i, \sigma^2)$$
+
+Now, let's look at an example with the following variables from the students evaluations dataset:
+
+* the numerical outcome variable teaching score **y**; and
+* the numerical explanatory variable beauty score **x**.
 
 # Exploratory Data Analysis {#sec:EDA}
-First, the study explored numerical summaries of the `r nrow(evals)` course evaluations, to get an idea of the scores distribution. These are shown in Table \ref{tab:summary-evals}. Additionally, Figure \ref{fig:histscores} shows the distribution of the `r nrow(evals)` evaluation scores.
 
-```{r summary.numerical.scores, echo=FALSE, eval=TRUE}
+An exploratory data analysis may involve:
 
-summaries = as.data.frame(c(min(evals$score),quantile(evals$score, probs = c(.25)),median(evals$score),mean(evals$score),quantile(evals$score, probs = c(.75)),max(evals$score)))
-row.names(summaries) = c("Min.","1st Qu.", "Median", "Mean", "3rd Qu.", "Max.")
-names(summaries) = c("Value")
-summaries = t(summaries)
-  
-   kable(summaries, caption = '\\label{tab:summary-evals} Summary Statistics on the 436 Course Evaluations', align="cccccc") %>%
-   kable_styling(font_size = 10, latex_options = "hold_position")
+1. Looking at the raw values of the data, either by looking at the spreadsheet directly, or using R.
+2. By computing various summary statistics, such as the five-number summary, means, and standard deviations.
+3. Plotting the data using various data vizualisation techniques.
+
+let's examine our data:
+
+```{r echo=TRUE, eval=TRUE, warning=TRUE, message=TRUE}
+glimpse(evals)
 ```
 
-```{r, echo=FALSE, eval = TRUE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:histscores} Histogram of the Scores Evaluation", fig.pos = "H"}
-ggplot(evals, aes(x = score)) +
-      geom_histogram(bins=8, color = "white", fill="steelblue") +
-      labs(x = "Evaluation Score", y="Count") 
+At the moment we are only really interested in the instructors teaching (score) and beauty (bty_avg) scores, and so we can look at a subset of the data as follows:
+
+```{r echo=TRUE, eval=TRUE}
+evals.scores <- evals %>%
+  select(score, bty_avg)
+
+sample_n(evals.scores, 10)
 ```
 
-Also, the gender and age distribution of the professors is shown in Figure \ref{fig:agegenderhist}.
+We can compute the summary statistics for all scores, and bty_avg variables, by using skim():
 
-```{r, echo=FALSE, eval = TRUE, warnings=FALSE, message=FALSE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:agegenderhist} Histogram of the Scores Evaluation", fig.pos = "H"}
-
-ggplot(evals, aes(x = age, fill=gender)) +
-      geom_histogram(color = "white") +
-      labs(x = "age", y="Count by Gender") 
+```{r echo=TRUE, eval=TRUE}
+  skim(evals.scores)
 ```
 
+The correlation coefficient can be computed in R using the get_correlation function from the moderndive package.
+
+Here's how:
+```{r echo=TRUE, eval=TRUE}
+evals.scores %>%
+  get_correlation(formula = score ~ bty_avg)
+```
+
+Here, we are given a correlation coefficient of 0.187 for the relationship between teaching (score) and beauty (bty_avg) scores. This suggests a rather weakly positive linear relationship between the two variables. There is some subjective interpretation surrounding correlation coefficients not very close to -1, 0, 1. The table below provides a rough guide as to the verbal interpretation of a correlation coefficient.
+
+|Correlation coefficient        |	Verbal interpretation                       |
+|:-----------------------------:|:-------------------------------------------:|
+|0.90 to 1.00 (-0.90 to -1.00)  |Very strong positive (negative) correlation  |
+|0.70 to 0.90 (-0.70 to -0.90)  |Strong positive (negative) correlation       |
+|0.50 to 0.70 (-0.50 to -0.70)	|Moderate positive (negative) correlation     |
+|0.30 to 0.50 (-0.30 to -0.50)	|Weak positive (negative) correlation         |
+|0.00 to 0.30 (0.00 to -0.30)	  |Very weak positive (negative) correlation    |
+
+```{r, fig.cap="\\label {fig:fig4}Relationship between teaching and beauty scores with regression line superimposed"}
+ggplot(evals.scores, aes(x = bty_avg, y = score)) +
+  geom_jitter(height=.1, width=.1)+
+  labs(title="Relationship of Teaching and Beauty Scores", 
+       x="Beauty Score",
+       y="Teaching Score")+
+  geom_smooth(method="lm", se=FALSE)
+```
 
 # Formal Data Analysis {#sec:FDA}
-To investigate the relationship between Evaluation Score, as a response variable, and Age and Gender as explanatory variables, we fit a linear regression model of the form:
 
-$$\widehat{\mbox{Evaluation\_Score}} = \alpha + \beta_1 ~ \mbox{Age} + \beta_2 ~ \mbox{Gender} + \epsilon_i, ~~~~ \epsilon_i \sim N(0, \sigma^2),$$
 
-We fit the linear regression model in R:
-
-```{r, eval = TRUE}
-model=lm(evals$score~evals$age+evals$gender)
+```{r regression}
+model <- lm(score ~ bty_avg, data = evals.scores)
+model
 ```
-```{r}
-summary(model)
-```
-From the model summary, we can see that both age and gender are significant predictors of evaluation score at 5% significance level. If we plot a scatter of Evaluation Score against Age and display points based on the Gender, we see Figure \ref{fig:regscatter}.
 
+This tells us that our best-fitting line to the data is:
 
-```{r, echo=FALSE, eval = TRUE, warnings=FALSE, message=FALSE, out.width = '75%', fig.align = "center", fig.cap = "\\label{fig:regscatter} Histogram of the Scores Evaluation", fig.pos = "H"}
+$$\widehat{\mbox{score}} = \widehat\alpha + \widehat\beta x_i = 3.88034 + .06664\cdot bty\_avg,$$
 
-ggplot(evals, aes(x = age, y= score, color=gender)) +
-      geom_point() +
-      labs(x = "Age", y="Score") +
-  geom_smooth(method = "lm", se = FALSE)
+where
+
+* $\widehat\alpha = 3.88034$ is the intercept coefficient and means that, for any instructor with a bty_avg = 0, their average teaching score would be 3.8803. Note that bty_avg = 0 is not actually possible as bty_avg is an average of beauty scores ranging between 1 and 10.
+
+* $\widehat\beta = 0.06664$  is the slope coefficient associated with the exploratory variable bty_avg, and summarises the relationship between score and bty_avg. That is, as bty_avg increases, so does score, such that
+  * For every 1 unit increase in bty_avg, there is an associated increase of, on average, 0.06664 units of score.
   
+Obtain the observed score and bty_avg for the 27th instructor:
+
+```{r task}
+score27=evals.scores[27,1]
+bty_avg27=evals.scores[27,2]
+predicted.score27 = 3.88034+0.06664*bty_avg27
+epsilon27 = score27 - predicted.score27
+epsilon27
+
+score13=evals.scores[13,1]
+bty_avg13=evals.scores[13,2]
+predicted.score13 = 3.88034+0.06664*bty_avg13
+predicted.score13
+epsilon13 = score13 - predicted.score13
+epsilon13
+
+
+score56=evals.scores[56,1]
+bty_avg56=evals.scores[56,2]
+predicted.score56 = 3.88034+0.06664*bty_avg56
+predicted.score56
+epsilon56 = score56 - predicted.score56
+epsilon56
+
+regression.points <- get_regression_points(model)
+regression.points
+```
+
+## Assessing the model fit
+
+Plot residuals against the explanatory variable:
+
+```{r residualsplot1}
+ggplot(regression.points, aes(x = bty_avg, y = residual)) +
+  geom_point() +
+  labs(x = "Beauty Score", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
+```
+
+Plot residuals against fitted values:
+
+```{r residualplot2}
+ggplot(regression.points, aes(x = score_hat, y = residual)) +
+  geom_point() +
+  labs(x = "Fitted values", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
 
 ```
 
+To check whether or not the residuals are normally distributed, we can plot a histogram of the residuals:
 
-# Conclusions {#sec:Conc}
+```{r residualplot3}
+ggplot(regression.points, aes(x=residual))+
+  geom_histogram(bins = 30, fill="Steelblue", color="white")+
+  labs(x="residuals values", y="count")
+```
 
+# Simple linear regression with one categorical explanatory variable
+
+## Exploratory Data Analysis {#sec:EDA2}
+
+Examine a subset of the gapminder data set relating to the year 2007. That is, we use the filter function to choose only the observations pertaining to 2007, and then select the variables we are interested in:
+
+```{r}
+expectancy2007 = gapminder %>% 
+  filter(year==2007) %>% 
+  select(country, continent, lifeExp)
+
+glimpse(expectancy2007)
+
+```
+
+obtain summary statistics using the skim function. First, let’s take a look at the life expectancy (lifeExp) and continent variables:
+
+```{r}
+expectancy2007 %>% 
+  select(continent, lifeExp) %>% 
+  skim()
+```
+
+summarise any differences in life expectancy by continent by taking a look at the median and mean life expectancies of each continent using the group_by and summarize functions as follows:
+
+```{r}
+expectancy2007 %>% 
+  group_by(continent) %>% 
+  summarize(Average.Life.Expectancy = mean(lifeExp), Median.Life.Expectancy=median(lifeExp))
+```
+
+Task: Obtain the worldwide median and mean life expectancies from the gapminder2007 data set.
+
+```{r}
+expectancy2007 %>% 
+  summarize(Average.Life.Expectancy = mean(lifeExp), Median.Life.Expectancy=median(lifeExp))
+```
+
+Boxplots are often used when examining the distribution of a numerical outcome variable across different levels of a categorical variable:
+
+```{r}
+expectancy2007.continent = expectancy2007 %>% 
+  group_by(continent) 
+
+ggplot(expectancy2007.continent, mapping=aes(x=factor(continent), y=lifeExp))+
+  geom_boxplot(fill="steelblue")+
+  labs(title="Life Expectancy Statistical Summary by Continent",
+       x="Continent",
+       y="Life Expectancy (Years)")
+```
+
+What country in Asia has a much lower life expectancy than the rest of the continent?
+
+```{r}
+expectancy2007 %>% 
+  filter(continent=="Asia") %>% 
+  top_n(1, -lifeExp)
+```
+
+## Formal Data Analysis {#sec:FDA2}
+
+Let us fit our regression model to the data, where lifeExp is our outcome variable y and continent is our categorical explanatory variable x:
+
+```{r}
+lifeExp.model <- lm(lifeExp ~ continent, data = expectancy2007)
+summary(lifeExp.model)
+```
+our regression equation is given as:
+
+$$\widehat{\mbox{life exp}} = \widehat\alpha+\widehat\beta_{Amer}\cdot\mathbb{I}_{Amer}(x)+\widehat\beta_{Asia}\cdot\mathbb{I}_{Asia}(x)+\widehat\beta_{Euro}\cdot\mathbb{I}_{Euro}(x)+\widehat\beta_{Ocean}\cdot\mathbb{I}_{Ocean}(x),$$
+
+where
+
+* the intercept $\widehat\alpha$ is the mean life expectancy for our baseline category Africa;
+
+* $\widehat\beta_{continent}$ is the difference in the mean life expectancy of a given continent relative to the baseline category Africa; and
+
+* $\mathbb{I}_{continent}(x)$ is an indicator function such that
+
+$$
+\mathbb{I}_{continent}(x) = \begin{cases}
+1 & \quad If~country~x~is~in~the~continent, \\
+0 & \quad Otherwise.
+\end{cases}
+$$
+
+we can obtain the fitted values and residuals in the same way we did previously:
+
+```{r}
+regression.points2 = get_regression_points(lifeExp.model)
+regression.points2
+
+which.max(regression.points2$residual)
+expectancy2007[which.max(regression.points2$residual),]
+```
+
+For assessing the assumptions surrounding the residuals for a categorical explanatory variable, we can plot the residuals for each continent:
+
+```{r}
+ggplot(regression.points2, mapping=aes(x=continent,y=residual))+
+  geom_jitter(width=.1)+
+  geom_hline(yintercept = 0, col = "blue")+
+  labs(title="Residuals Vs. Continent Plot",
+       x="Continent",
+       y="Residual(Years)")
+```
+
+To check that the residual errors are normally distributed, we plot a histogram of them:
+
+```{r}
+ggplot(regression.points2, aes(x = residual)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  labs(x = "Residual")
+```
